@@ -1,0 +1,23 @@
+{
+  "name": "sistema-meta",
+  "version": "1.0.0",
+  "description": "Calculadora de Meta - Concilig - Demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migrate.js",
+    "test": "node scripts/test_bv_calculos.js",
+    "test:integration": "node scripts/test_api_no_risks_bv_cartao.js && node scripts/test_ranking_api.js"
+  },
+  "devDependencies": {
+    "wait-on": "^8.0.0"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "sqlite3": "^5.1.6",
+    "body-parser": "^1.20.2"
+  }
+}

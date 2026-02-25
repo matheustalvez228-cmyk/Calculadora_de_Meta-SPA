@@ -1,0 +1,221 @@
+═══════════════════════════════════════════════════════════════════════════════
+GUIA DE LOGIN - SISTEMA META CONCILIG
+═══════════════════════════════════════════════════════════════════════════════
+
+Bem-vindo ao Sistema Meta Concilig! Este documento contém as credenciais
+para acessar a plataforma em diferentes perfis de gerenciamento.
+
+───────────────────────────────────────────────────────────────────────────────
+1. ACESSAR A PLATAFORMA
+───────────────────────────────────────────────────────────────────────────────
+
+1. Abra seu navegador web
+2. Acesse: http://localhost:3000
+3. Você verá a tela de login com campos para Matrícula e Senha
+4. Escolha seu perfil abaixo e use as credenciais fornecidas
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2. USUÁRIOS MASTERS (ADMINISTRADORES)
+═══════════════════════════════════════════════════════════════════════════════
+
+Estes usuários têm acesso completo ao dashboard de gerenciamento:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MASTER - BV RODAS (Gestor de Rodas/Bom Pagador)                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Matrícula: 10001                                                            │
+│ Senha:     123456                                                           │
+│ Acesso:    Dashboard de recebimento, gerenciamento de operadores,          │
+│            análise de performance e renegociações                           │
+│ Operadores: 5 operadores na carteira BV_RODAS                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MASTER - BV CARTÕES CLUSTER 1 (Admin CL1)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Matrícula: 10002                                                            │
+│ Senha:     123456                                                           │
+│ Acesso:    Dashboard de cartões Cluster 1, operadores CL1,                │
+│            análise de atrasos e renegociações                               │
+│ Operadores: 4 operadores na carteira BV_CARTAO (CL1)                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MASTER - BV CARTÕES CLUSTER 2 (Admin CL2)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Matrícula: 10003                                                            │
+│ Senha:     123456                                                           │
+│ Acesso:    Dashboard de cartões Cluster 2, operadores CL2,                │
+│            análise de atrasos e renegociações                               │
+│ Operadores: 4 operadores na carteira BV_CARTAO (CL2)                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MASTER - ADMINISTRADOR GERAL (Admin Sistema)                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Matrícula: 10004                                                            │
+│ Senha:     123456                                                           │
+│ Acesso:    Visão completa de todas as carteiras,                           │
+│            relatórios executivos e configurações                            │
+│ Carteiras: Acesso total a BV_RODAS e BV_CARTAO                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3. OPERADORES (USUÁRIOS NORMAIS)
+═══════════════════════════════════════════════════════════════════════════════
+
+Operadores podem acessar seu dashboard pessoal para visualizar performance,
+metas e sistema de gamificação (ConcCoins):
+
+Todos os operadores usam a mesma senha: 123456
+
+BV RODAS - OPERADORES (5 usuários):
+├─ 20001 | Carlos Machado
+├─ 20002 | Ana Silva
+├─ 20003 | Bruno Santos
+├─ 20004 | Mariana Costa
+└─ 20005 | Lucas Oliveira
+
+BV CARTÕES CL1 - OPERADORES (4 usuários):
+├─ 30001 | Fernando Alves
+├─ 30002 | Juliana Mendes
+├─ 30003 | Roberto Lima
+└─ 30004 | Beatriz Gomes
+
+BV CARTÕES CL2 - OPERADORES (4 usuários):
+├─ 40001 | Paulo Castro
+├─ 40002 | Camila Rocha
+├─ 40003 | Felipe Pinto
+└─ 40004 | Sophia Barbosa
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4. EXEMPLO: COMO FAZER LOGIN
+═══════════════════════════════════════════════════════════════════════════════
+
+PASSO 1 - Abrir o Sistema
+  └─ http://localhost:3000
+
+PASSO 2 - Tela de Login
+  ├─ Campo "Matrícula": Digite o número da matrícula
+  ├─ Campo "Senha": Digite a senha (123456 para todos no demo)
+  └─ Botão "Entrar"
+
+PASSO 3 - Acessar Dashboard
+  └─ Após login bem-sucedido, você verá seu dashboard personalizado
+     (Master: dashboard gerencial / Operador: dashboard pessoal)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5. FUNCIONALIDADES POR PERFIL
+═══════════════════════════════════════════════════════════════════════════════
+
+👑 MASTER (Gestor de Carteira):
+  ✓ Ver todos os operadores da carteira
+  ✓ Visualizar recebimento total e percentual de atingimento de meta
+  ✓ Análise de performance individual por operador
+  ✓ Gerenciar metas e bonificações
+  ✓ Visualizar renegociações em aberto
+  ✓ Exportar relatórios
+  ✓ Configurar parâmetros da carteira
+
+👤 OPERADOR (Gestor Individual):
+  ✓ Ver própria performance vs. meta
+  ✓ Visualizar saldo de ConcCoins (moeda de gamificação)
+  ✓ Desbloquear carros com pontos
+  ✓ Consultar histórico de movimentações
+  ✓ Ver ranking de operadores
+  ✓ Acompanhar evolução mensal
+
+
+═══════════════════════════════════════════════════════════════════════════════
+6. ESTRUTURA DE DADOS DE DEMONSTRAÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+BV_RODAS (Carteira de Rodas):
+├─ Meta Total:           R$ 1.000.000,00
+├─ Pool de Bonificação:  R$ 50.000,00
+├─ Taxa de Distribuição: 10%
+└─ 5 operadores ativos
+
+BV_CARTAO (Carteira de Cartões - CL1 + CL2):
+├─ Meta Total:           R$ 500.000,00
+├─ Pool de Bonificação:  R$ 30.000,00
+├─ Taxa de Distribuição: 8%
+└─ 8 operadores ativos (4 em CL1, 4 em CL2)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+7. SISTEMA DE PONTOS (ConcCoins)
+═══════════════════════════════════════════════════════════════════════════════
+
+Cada operador ganha pontos (ConcCoins) baseado em sua performance:
+
+Fórmula: Pontos = (Valor Realizado / Meta) × 100
+
+Uso dos Pontos:
+  • Desbloquear carros no sistema de gamificação
+  • Cada carro tem um custo diferente em pontos
+  • Quanto melhor a performance, mais rápido desbloqueia carros
+
+
+═══════════════════════════════════════════════════════════════════════════════
+8. ESTRUTURA DE CARTEIRAS
+═══════════════════════════════════════════════════════════════════════════════
+
+Cada carteira (BV_RODAS ou BV_CARTAO) possui:
+
+├─ SESSÃO
+│  └─ Define o tipo de cálculo usado (bv_rodas ou bv_cartao)
+│
+├─ META CARTEIRA
+│  └─ Objetivo total da carteira para o período
+│
+├─ BONIFICAÇÃO
+│  └─ Pool de recursos disponível para distribuir entre operadores
+│
+└─ TAXA
+   └─ Percentual usado para calcular quanto será distribuído
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9. TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+❌ "Usuário não encontrado"
+   → Verifique se a matrícula está correta
+   → Verifique se o banco de dados foi inicializado (rode: node init_db.js)
+
+❌ "Senha inválida"
+   → Use a senha padrão: 123456
+   → Certifique-se de não ter CAPS LOCK ativado
+
+❌ "Não consigo acessar http://localhost:3000"
+   → Verifique se o servidor está rodando (npm start)
+   → Verifique se a porta 3000 está disponível
+
+❌ "Erro de conexão com banco de dados"
+   → Certifique-se de que data.sqlite3 existe em backend/
+   → Rode: node init_db.js para criar novo banco
+
+
+═══════════════════════════════════════════════════════════════════════════════
+10. INICIANDO O SISTEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abra terminal na pasta backend/
+2. Execute: npm install
+3. Execute: node server.js
+4. Acesse: http://localhost:3000
+5. Faça login com qualquer credencial acima
+
+Para reinicializar o banco de dados do zero:
+  node init_db.js
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 Última atualização: 2026-02-20
+🔐 Versão de demonstração - Senhas padrão em ambiente de demo apenas
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,1241 @@
+═══════════════════════════════════════════════════════════════════════════════
+DOCUMENTAÇÃO COMPLETA DO SISTEMA META - CONCILIG
+═══════════════════════════════════════════════════════════════════════════════
+
+VERSÃO: 1.0
+DATA: 2026-02-09
+OBJETIVO: Explicar linha por linha como o projeto funciona, fluxo de dados,
+          armazenamento, e entrega de informações.
+
+
+ÍNDICE:
+───────────────────────────────────────────────────────────────────────────────
+1. VISÃO GERAL DO PROJETO
+2. ARQUITETURA GERAL (Backend + Frontend)
+3. FLUXO DE INICIALIZAÇÃO
+4. SISTEMA DE AUTENTICAÇÃO (JWT)
+5. ESTRUTURA DE DADOS (Banco de Dados SQLite)
+6. FLUXO COMPLETO DE DADOS (Entrada → Processamento → Saída)
+7. ENDPOINTS DA API (Detalhado)
+8. LÓGICA DE NEGÓCIO (Metas, Bonificações, ConcCoins)
+9. COMPONENTES FRONTEND
+10. SCRIPTS E UTILITÁRIOS
+
+
+═══════════════════════════════════════════════════════════════════════════════
+1. VISÃO GERAL DO PROJETO
+═══════════════════════════════════════════════════════════════════════════════
+
+Sistema Meta é uma plataforma web para:
+  • Gerenciamento de operadores e suas metas de performance
+  • Cálculo dinâmico de bonificações baseado em performance
+  • Gestão de carteiras (wallets) de múltiplos tipos (BV_RODAS, BV_CARTÃO)
+  • Sistema de gamificação com pontos (ConcCoins)
+  • Análise de riscos e renegociações
+
+TECNOLOGIAS:
+  Backend:  Node.js 16+ | Express.js | SQLite3 | JWT | bcrypt
+  Frontend: HTML5 | CSS3 | JavaScript (Vanilla) | SPA (Single Page App)
+  Porta:    3000 (desenvolvimento)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2. ARQUITETURA GERAL
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           FLUXO DE REQUISIÇÃO                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  CLIENTE (Browser)              SERVIDOR (Node.js)        BANCO DE DADOS    │
+│      │                                 │                       │            │
+│      ├─ 1. HTTP Request ────────────>  │                       │            │
+│      │   (Com JWT Token)               │                       │            │
+│      │                                 ├─ 2. Verificar Token   │            │
+│      │                                 │                       │            │
+│      │                                 ├─ 3. Query SQL ──────> │            │
+│      │                                 │                       │            │
+│      │                                 │ <─ 4. Retorna Dados ─ │            │
+│      │                                 │                       │            │
+│      │                                 ├─ 5. Processar Dados   │            │
+│      │                                 │    (Cálculos)         │            │
+│      │                                 │                       │            │
+│      │ <─ 6. JSON Response ──────────  │                       │            │
+│      │                                 │                       │            │
+│      ├─ 7. Atualizar DOM               │                       │            │
+│      │                                 │                       │            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+ESTRUTURA DE PASTAS:
+
+sistema-meta-patched/
+├── backend/
+│   ├── server.js                 ← Arquivo principal Express
+│   ├── data.sqlite3              ← Banco de dados SQLite
+│   ├── package.json              ← Dependências Node
+│   ├── migrate.js                ← Script de inicialização do BD
+│   ├── routes/
+│   │   ├── operator.js           ← GET dados de um operador específico
+│   │   ├── operators.js          ← POST/PUT/DELETE operadores (CRUD)
+│   │   ├── master.js             ← GET dados e dashboards de mestres
+│   │   ├── wallets.js            ← GET/POST configurações de carteiras
+│   │   └── conc.js               ← GET/POST ConcCoins e desbloqueios
+│   ├── utils/
+│   │   └── bv_calculos.js        ← Lógica de cálculo BV_CARTÃO
+│   └── scripts/
+│       ├── check_entries_for_user.js
+│       ├── inspect_operator.js
+│       ├── list_risks.js
+│       └── query_user.js
+│
+└── frontend/
+    ├── index.html                ← SPA principal
+    ├── login.html                ← Página de login
+    ├── operadores_tabela.html    ← Tabela de operadores
+    ├── js/
+    │   ├── spa.js                ← Roteamento SPA
+    │   ├── auth.js               ← Login/Registro
+    │   ├── operator.js            ← Dashboard operador
+    │   ├── master.js              ← Dashboard master
+    │   ├── master-system.js       ← Sistema avançado master
+    │   ├── garagem.js             ← Garagem de carros (ConcCoins)
+    │   ├── conc-racing.js         ← Ranking e racing
+    │   └── ui_common.js           ← Funções de UI reutilizáveis
+    └── css/
+        └── style.css              ← Estilos CSS
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3. FLUXO DE INICIALIZAÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP 1: npm install (Backend)
+────────────────────────────
+  1. Lê backend/package.json
+  2. Instala dependências:
+     • express (4.18.2) - framework web
+     • sqlite3 (5.1.6) - driver do banco de dados
+     • jsonwebtoken (9.0.0) - autenticação JWT
+     • bcrypt (5.1.0) - criptografia de senha
+     • cors (2.8.5) - permitir requisições cross-origin
+     • body-parser (1.20.2) - parsear JSON
+  3. Cria pasta node_modules/
+
+
+STEP 2: node server.js (Iniciar Servidor)
+──────────────────────────────────────────
+  Arquivo: backend/server.js
+
+  Linha 1-8: Importações
+    const express = require('express');
+    const sqlite3 = require('sqlite3').verbose();
+    const bcrypt = require('bcrypt');
+    const jwt = require('jsonwebtoken');
+    // ... etc
+
+  Linha 10: Define segredo JWT
+    const SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+    → Se env var não definida, usa valor padrão (NUNCA faça isso em produção!)
+
+  Linha 11: Define caminho do banco de dados
+    const DB_FILE = path.join(__dirname, 'data.sqlite3');
+    → __dirname = pasta atual (/backend)
+    → Cria/abre arquivo data.sqlite3
+
+  Linha 13: Inicializa conexão SQLite
+    const db = new sqlite3.Database(DB_FILE);
+    → Cria objeto `db` para fazer queries
+
+  Linha 16-17: Configura Express
+    const app = express();
+    app.use(cors());
+    app.use(bodyParser.json());
+    → cors() = permite requisições de outros domínios
+    → bodyParser.json() = converte JSON → objetos JS
+
+  Linha 20-25: Serve Frontend (SPA)
+    app.use('/', express.static(path.join(__dirname, '..', 'frontend'), {
+        index: 'index.html'
+    }));
+    → Qualquer arquivo em /frontend é servido estaticamente
+    → GET / retorna index.html
+    → GET /index.html, /js/app.js, /css/style.css, etc.
+
+  Linha 28-49: Importa e monta rotas
+    const operatorRoutes = require('./routes/operator');
+    app.use('/api/operator', operatorRoutes);
+    → Todos os endpoints começam com /api/operator/...
+
+    const operatorsRoutes = require('./routes/operators');
+    app.use('/api/operators', operatorsRoutes);
+    → POST/PUT/DELETE em /api/operators/...
+
+    const masterRoutes = require('./routes/master');
+    app.use('/api/master', masterRoutes);
+    → GET em /api/master/...
+
+    const walletsRoutes = require('./routes/wallets');
+    app.use('/api/wallets', walletsRoutes);
+    → GET/POST em /api/wallets/...
+
+    const concRoutes = require('./routes/conc');
+    app.use('/api/conc', concRoutes);
+    → GET/POST em /api/conc/...
+
+  Linha 53-73: Funções auxiliares de banco de dados
+    function run(sql, params = []) { ... }
+    → Executa INSERT, UPDATE, DELETE
+    → Retorna Promise
+    → Exemplo: await run('INSERT INTO users(id,name) VALUES(?,?)', [1, 'João'])
+
+    function all(sql, params = []) { ... }
+    → Executa SELECT retornando múltiplas linhas
+    → Retorna Promise com array
+    → Exemplo: const users = await all('SELECT * FROM users')
+
+    function get(sql, params = []) { ... }
+    → Executa SELECT retornando uma linha
+    → Retorna Promise com objeto
+    → Exemplo: const user = await get('SELECT * FROM users WHERE id=?', [1])
+
+  Linha 75-92: Middleware de Autenticação
+    function authMiddleware(req, res, next) {
+      const h = req.headers['authorization'];
+      if(!h) return res.status(401).json({ error: 'missing token' });
+
+      const token = h.split(' ')[1];
+      // Token deve ser: "Bearer XXXXX..."
+      // Pega a parte depois de "Bearer "
+
+      try {
+        const payload = jwt.verify(token, SECRET);
+        // Verifica se token é válido com SECRET
+        // Decodifica para acessar id, isMaster, wallet
+
+        req.user = payload;
+        next();
+      } catch(e) {
+        return res.status(401).json({ error: 'invalid token' });
+      }
+    }
+
+  Linha 95-166: initDb()
+    → Verifica se tabelas têm todas as colunas necessárias
+    → Se falta coluna (update antigo), adiciona dinamicamente
+    → Exemplo: ALTER TABLE entries ADD COLUMN conc_awarded INTEGER DEFAULT 0
+    → Executado no startup, não bloqueia servidor
+
+  Linha 169-173: Login POST /api/login
+    → Recebe { id, password, session }
+    → Valida credenciais no banco
+    → Se OK: gera JWT token
+    → Retorna token + dados do user (id, isMaster, wallet)
+
+  Linha 175-193: Registrar POST /api/register
+    → Recebe { id, password, wallet, name, session }
+    → Hash da senha com bcrypt
+    → Insere novo user na tabela users
+    → Retorna token (auto-login)
+
+  Linha 195-201: Inicia servidor
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+    → Escuta em http://localhost:3000
+    → Pronto para receber requisições
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4. SISTEMA DE AUTENTICAÇÃO (JWT)
+═══════════════════════════════════════════════════════════════════════════════
+
+JWT = JSON Web Token (3 partes separadas por pontos)
+
+FORMATO:
+  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjAwMDAxIiwiaXNNYXN0ZXIiOnRydWUsIndhasJpZCI6IkJWIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+  └─ header ────────────────────────────┘ └─ payload ──────────────────┘ └─ signature ──┘
+
+Header: { alg: 'HS256', typ: 'JWT' }
+
+Payload: { id: '00001', isMaster: true, wallet: 'BV' } (informações do user)
+
+Signature: hash(header + payload + SECRET)
+  → Se alguém alterar payload, hash não bate, token fica inválido
+  → Só servidor sabe SECRET, logo só ele pode criar tokens válidos
+
+
+FLUXO LOGIN:
+
+1. FRONTEND (auth.js)
+   ├─ User clica em "Login"
+   ├─ Lê inputs: id, password, session
+   ├─ POST /api/login { id, password, session }
+   │
+2. SERVIDOR (server.js linha 169-173)
+   ├─ SELECT * FROM users WHERE id = ?
+   ├─ Compara password com hash armazenado (bcrypt.compare)
+   ├─ Se OK:
+   │  ├─ Cria payload: { id, isMaster, wallet }
+   │  ├─ Gera JWT: jwt.sign(payload, SECRET, { expiresIn: '7d' })
+   │  └─ Retorna: { token: "Bearer ...", user: {...} }
+   ├─ Se erro:
+   │  └─ Retorna: { error: "Invalid credentials" }
+   │
+3. FRONTEND (auth.js)
+   ├─ localStorage.setItem('token', res.token)
+   ├─ localStorage.setItem('user_id', res.user.id)
+   ├─ localStorage.setItem('wallet', res.user.wallet)
+   ├─ localStorage.setItem('isMaster', res.user.isMaster)
+   └─ Redireciona para dashboard
+
+
+FLUXO REQUISIÇÃO COM TOKEN:
+
+1. FRONTEND (qualquer requisição)
+   ├─ const token = localStorage.getItem('token')
+   ├─ headers['Authorization'] = 'Bearer ' + token
+   ├─ fetch('/api/operator/00001', { headers })
+   │
+2. SERVIDOR (middleware)
+   ├─ Lê header Authorization
+   ├─ Extrai token (split por espaço, pega [1])
+   ├─ jwt.verify(token, SECRET)
+   ├─ Se válido:
+   │  ├─ Decodifica payload
+   │  ├─ req.user = payload (agora req.user.id, req.user.isMaster, etc.)
+   │  └─ next() (continua para handler da rota)
+   ├─ Se inválido:
+   │  └─ Retorna 401 Unauthorized
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5. ESTRUTURA DE DADOS (SQLite)
+═══════════════════════════════════════════════════════════════════════════════
+
+TABELAS PRINCIPAIS:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ users                                                                       │
+├──────────┬──────────┬──────────┬────────┬──────────┬────────┬──────────────┤
+│ id       │ password │ isMaster │ wallet │ name     │ status │ selectedCar  │
+│ (TEXT)   │ (TEXT)   │ (BOOL)   │(TEXT) │ (TEXT)   │(TEXT) │ (TEXT)       │
+├──────────┼──────────┼──────────┼────────┼──────────┼────────┼──────────────┤
+│ '00001'  │ hash...  │ 1        │ 'BV'   │ 'João'   │ 'ativo'│ 'Carro1.jpg' │
+│ '00001'  │ hash...  │ 0        │ 'BV'   │ 'Maria'  │ 'ativo'│ NULL         │
+└──────────┴──────────┴──────────┴────────┴──────────┴────────┴──────────────┘
+
+Explicação:
+  • id: Identificador único do usuário (00001-00005 = mestres pré-criados)
+  • password: Senha criptografada com bcrypt (nunca armazenar em texto claro!)
+  • isMaster: 1 = master (cria operadores), 0 = operador (normal)
+  • wallet: 'BV_RODAS' ou 'BV_CARTAO' (tipo de carteira)
+  • name: Nome exibido na interface
+  • status: 'ativo', 'inativo', 'suspenso', etc.
+  • selectedCar: Qual carro selecionou na garagem (BV_RODAS)
+
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ entries (Meta e Performance)                                               │
+├────────┬────────────┬──────────────┬────────────┬────────┬──────────┬──────┤
+│ id     │ operatorId │ monthlyGoal  │ actualValue│receivd │timestamp │ ...  │
+│(INT)   │ (TEXT)     │ (REAL)       │ (REAL)     │(REAL)  │(TEXT)    │      │
+├────────┼────────────┼──────────────┼────────────┼────────┼──────────┼──────┤
+│ 1      │ '00010'    │ 100000.00    │ 85000.00   │78500   │ '...'    │ ...  │
+│ 2      │ '00010'    │ 150000.00    │ 160000.00  │92000   │ '...'    │ ...  │
+└────────┴────────────┴──────────────┴────────────┴────────┴──────────┴──────┘
+
+Explicação:
+  • id: Chave primária (auto-increment)
+  • operatorId: Referência para users.id (operador que criou a entrada)
+  • monthlyGoal: Meta mensal do operador (ex: 100.000,00)
+  • actualValue: Valor real que operador relatou (faturamento)
+  • receivedValue: Valor que operador recebe (base + bônus/penalidades)
+  • timestamp: Data/hora do registro
+
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ wallets (Carteiras e Bonificações)                                         │
+├────────┬─────────┬─────────┬──────────────┬─────────────┬──────────────────┤
+│ wallet │bonificac│ taxa    │ session_type │ meta_cartei │ ... outros ...   │
+│(TEXT)  │ (REAL)  │ (REAL)  │ (TEXT)       │ a (REAL)    │                  │
+├────────┼─────────┼─────────┼──────────────┼─────────────┼──────────────────┤
+│ 'BV'   │ 50000   │ 10      │ 'bv_rodas'   │ 1000000     │ ...              │
+│ 'CART' │ 100000  │ 5       │ 'bv_cartao'  │ 5000000     │ ...              │
+└────────┴─────────┴─────────┴──────────────┴─────────────┴──────────────────┘
+
+Explicação:
+  • wallet: Nome da carteira (BV_RODAS, BV_CARTÃO)
+  • bonificacao: Pool de bônus disponível (50.000,00)
+  • taxa: Taxa de distribuição (10% = 5.000,00 será distribuído)
+  • session_type: Tipo de cálculo aplicado (BV_RODAS vs BV_CARTÃO)
+  • meta_carteira: Meta total da carteira
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ risks (Renegociações)                                                     │
+├────────┬────────────┬─────────────┬──────────────────┬────────────────────┤
+│ id     │ entryId    │ riskPremium │   description    │ ... outros ...     │
+│(INT)   │ (INT)      │ (REAL)      │      (TEXT)      │                    │
+├────────┼────────────┼─────────────┼──────────────────┼────────────────────┤
+│ 1      │ 1          │ 500.00      │ 'Atraso 30 dias' │      ...           │
+│ 2      │ 1          │ 1000.00     │ 'Disputa'        │      ...           │
+└────────┴────────────┴─────────────┴──────────────────┴────────────────────┘
+
+Explicação:
+  • id: Chave primária
+  • entryId: Referência para entries.id
+  • riskPremium: Valor adicional por renegociação (bônus por resolver problema)
+  • description: Descrição do risco/renegociação
+
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ conc_wallets (Pontos do Operador)                                        │
+├────────────┬────────────┬─────────┬──────────────────────────────────────┤
+│ operatorId │ balance    │ history │ ... outros ...                       │
+│ (TEXT)     │ (INT)      │ (TEXT)  │                                      │
+├────────────┼────────────┼─────────┼──────────────────────────────────────┤
+│ '00010'    │ 1500       │ '[...]' │ ...                                  │
+│ '00011'    │ 3200       │ '[...]' │ ...                                  │
+└────────────┴────────────┴─────────┴──────────────────────────────────────┘
+
+Explicação:
+  • operatorId: Qual operador é dono desses pontos
+  • balance: Saldo atual de ConcCoins (pontos)
+  • history: JSON com histórico de transações
+
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ unlocks (Carros Desbloqueados)                                            │
+├────────────┬────────────┬─────────┬────────────┬──────────────────────────┤
+│ operatorId │ carPath    │ cost    │ timestamp  │ ...                      │
+│ (TEXT)     │ (TEXT)     │ (INT)   │ (TEXT)     │                          │
+├────────────┼────────────┼─────────┼────────────┼──────────────────────────┤
+│ '00010'    │'Carro1.jpg'│ 500     │ '...'      │ ...                      │
+│ '00010'    │'Carro2.jpg'│ 800     │ '...'      │ ...                      │
+└────────────┴────────────┴─────────┴────────────┴──────────────────────────┘
+
+Explicação:
+  • operatorId: Qual operador desbloqueou
+  • carPath: Caminho da imagem do carro
+  • cost: Quantos ConcCoins custou
+  • timestamp: Quando foi desbloqueado
+
+
+═══════════════════════════════════════════════════════════════════════════════
+6. FLUXO COMPLETO DE DADOS (Entrada → Processamento → Saída)
+═══════════════════════════════════════════════════════════════════════════════
+
+EXEMPLO 1: OPERADOR LOGA E VÊ SEU DASHBOARD
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: LOGIN                                                                │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ Frontend (login.html):                                                       │
+│   User digita: id='00010', password='1234'                                   │
+│   Clica em "Login"                                                           │
+│   → POST /api/login { id: '00010', password: '1234' }                        │
+│                                                                              │
+│ Server (server.js linha 169):                                                │
+│   1. Recebe requisição POST                                                  │
+│   2. Extrai body: { id: '00010', password: '1234' }                          │
+│   3. SELECT * FROM users WHERE id = '00010'                                  │
+│      → Retorna: { id: '00010', password: '$2b$10$...hash...', isMaster: 0,   │
+│                    wallet: 'BV', name: 'Maria' }                             │
+│   4. bcrypt.compare('1234', '$2b$10$...hash...')                             │
+│      → Verifica se '1234' corresponde ao hash                                │
+│      → Retorna: true ✓                                                       │
+│   5. Gera JWT token:                                                         │
+│      payload = { id: '00010', isMaster: 0, wallet: 'BV' }                    │
+│      token = jwt.sign(payload, SECRET, { expiresIn: '7d' })                  │
+│      → eyJhbGc...aWQiOi...                                                   │
+│   6. Retorna: { token: 'eyJhbGc...', user: { id, isMaster, wallet } }        │
+│                                                                              │
+│ Frontend (auth.js):                                                          │
+│   1. Recebe resposta com token                                               │
+│   2. localStorage.setItem('token', 'eyJhbGc...')                             │
+│   3. localStorage.setItem('user_id', '00010')                                │
+│   4. localStorage.setItem('wallet', 'BV')                                    │
+│   5. localStorage.setItem('isMaster', false)                                 │
+│   6. location.href = '/operador_dashboard.html'                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: CARREGAR DASHBOARD DO OPERADOR                                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ Frontend (operator.js - função initOperatorLazy):                            │
+│   1. Lê localStorage.getItem('token')                                        │
+│      → 'eyJhbGc...'                                                          │
+│   2. Aguarda DOM ficar pronto (Intersection Observer)                        │
+│   3. Chama loadOperatorData()                                                │
+│      headers = {                                                             │
+│        'Authorization': 'Bearer eyJhbGc...',                                 │
+│        'Content-Type': 'application/json'                                    │
+│      }                                                                       │
+│   4. fetch('/api/operator/00010', { headers })                               │
+│                                                                              │
+│ Server (routes/operator.js - GET /api/operator/:id):                         │
+│   1. Middleware authMiddleware:                                              │
+│      • Lê Authorization header: 'Bearer eyJhbGc...'                          │
+│      • Extrai token: 'eyJhbGc...'                                            │
+│      • jwt.verify(token, SECRET)                                             │
+│        → Decodifica e valida                                                 │
+│        → payload = { id: '00010', isMaster: 0, wallet: 'BV' }                │
+│      • req.user = payload                                                    │
+│   2. Handler GET /:id:                                                       │
+│      • id = req.params.id = '00010'                                          │
+│      • SELECT * FROM users WHERE id = '00010'                                │
+│        → user = { id: '00010', name: 'Maria', wallet: 'BV', isMaster: 0 }    │
+│      • SELECT balance FROM conc_wallets WHERE operatorId = '00010'           │
+│        → cb = { balance: 1500 }                                              │
+│        → concBalance = 1500                                                  │
+│      • SELECT * FROM entries WHERE operatorId = '00010'                      │
+│        ORDER BY id DESC LIMIT 1                                              │
+│        → entry = { id: 1, monthlyGoal: 100000, actualValue: 85000,           │
+│                    receivedValue: 78500, timestamp: '...' }                  │
+│      • SELECT * FROM risks WHERE entryId = 1                                 │
+│        → risks = [{ id: 1, riskPremium: 500 }, { id: 2, ... }]               │
+│      • Calcula:                                                              │
+│        realFaturamento = 85000                                               │
+│        riskSum = 500 + 1000 = 1500                                           │
+│        calculatedReceived = 78500                                            │
+│        baseValue = 78500 - 1500 = 77000                                      │
+│        percentualAtingido = (85000 / 100000) * 100 = 85%                     │
+│      • Retorna:                                                              │
+│        {                                                                     │
+│          user: { id: '00010', name: 'Maria', ... },                          │
+│          entry: { monthlyGoal: 100000, actualValue: 85000, ... },            │
+│          breakdown: {                                                        │
+│            realFaturamento: 85000,                                           │
+│            baseValue: 77000,                                                 │
+│            riskSum: 1500,                                                    │
+│            percentualAtingido: 85.00,                                        │
+│            concBalance: 1500                                                 │
+│          },                                                                  │
+│          risks: [...]                                                        │
+│        }                                                                     │
+│                                                                              │
+│ Frontend (operator.js - loadOperatorData):                                   │
+│   1. Recebe response JSON                                                    │
+│   2. Atualiza DOM:                                                           │
+│      document.getElementById('operatorMatricula').textContent = '00010'      │
+│      document.getElementById('operatorName').textContent = 'Maria'           │
+│      document.getElementById('operatorMeta').value = '100.000,00'            │
+│      document.getElementById('operatorValor').value = '85.000,00'            │
+│      document.getElementById('operatorPercentual').value = '85,00%'          │
+│      document.getElementById('operatorRecebido').value = '78.500,00'         │
+│      document.getElementById('opConcBalance').value = '1.500'                │
+│   3. Renderiza tabela de riscos com forEach(risks)                           │
+│   4. User vê dashboard completo                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+RESUMO DO FLUXO:
+  Entrada → Servidor valida JWT → Query BD → Processa dados → Retorna JSON
+      → Frontend recebe → Atualiza DOM → User vê na tela
+
+
+EXEMPLO 2: MASTER SALVA CONFIGURAÇÕES DE WALLET
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: MASTER PREENCHE FORMULÁRIO                                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ Frontend (master.js):                                                        │
+│   User (master) preenche:                                                    │
+│   • Bonificação: 50000.00                                                    │
+│   • Taxa: 10% (10)                                                           │
+│   • Aloca operadores:                                                        │
+│     - '00010': 40% (Maria)                                                   │
+│     - '00011': 60% (João)                                                    │
+│   Clica "Salvar"                                                             │
+│   → POST /api/wallets/BV                                                     │
+│     Headers: { Authorization: 'Bearer ...', Content-Type: 'application/json'}│
+│     Body: {                                                                  │
+│       bonificacao: 50000,                                                    │
+│       taxa: 10,                                                              │
+│       allocations: { '00010': 40, '00011': 60 }                              │
+│     }                                                                        │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: SERVIDOR PROCESSA E RECALCULA                                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│ Server (routes/wallets.js - POST /:wallet):                                  │
+│   1. Extrai wallet = 'BV', bonificacao=50000, taxa=10                        │
+│   2. UPDATE wallets SET bonificacao=50000, taxa=10 WHERE wallet='BV'         │
+│      → Persiste configurações                                                │
+│                                                                              │
+│   3. DELETE FROM allocations WHERE wallet='BV'                               │
+│      → Limpa alocações antigas                                               │
+│                                                                              │
+│   4. Calcula pool a distribuir:                                              │
+│      B = 50000 * (10 / 100) = 5000                                           │
+│      → 5.000,00 de bônus serão distribuídos entre os operadores              │
+│                                                                              │
+│   5. Para cada operador com alocação:                                        │
+│      ├─ INSERT allocations(wallet, operatorId, percent) VALUES               │
+│      │  ('BV', '00010', 40), ('BV', '00011', 60)                             │
+│      │                                                                       │
+│      ├─ Para '00010' (Maria):                                                │ 
+│      │  • SELECT * FROM entries WHERE operatorId='00010' ORDER BY id DESC    │
+│      │    → entry = { monthlyGoal: 100000, actualValue: 85000 }              │
+│      │  • percentualAtingido = (85000 / 100000) * 100 = 85%                  │
+│      │  • weight = max(0, 85 - 100) = max(0, -15) = 0                        │
+│      │    → Maria não atingiu 100%, então weight=0, não recebe bônus         │
+│      │                                                                       │
+│      └─ Para '00011' (João):                                                 │
+│         • SELECT * FROM entries WHERE operatorId='00011' ORDER BY id DESC    │
+│           → entry = { monthlyGoal: 100000, actualValue: 160000 }             │
+│         • percentualAtingido = (160000 / 100000) * 100 = 160%                │
+│         • weight = max(0, 160 - 100) = 60                                    │
+│           → João ultrapassou a meta de 60%, recebe bônus                     │
+│                                                                              │
+│   6. Calcula total de weights:                                               │
+│      totalWeight = 0 + 60 = 60                                               │
+│      → Apenas João tem peso positivo                                         │
+│                                                                              │
+│   7. Distribui bônus:                                                        │
+│      ├─ Maria: baseValue = 0 * (0 / 60) = 0                                  │
+│      │  + risks = 0                                                          │
+│      │  = newReceivedValue = 0                                               │
+│      │  UPDATE entries SET receivedValue=0 WHERE id=...                      │
+│      │                                                                       │
+│      └─ João: baseValue = 5000 * (60 / 60) = 5000                            │
+│         + risks = 2000 (exemplo, 4 renegociações * 500)                      │
+│         = newReceivedValue = 7000                                            │
+│         UPDATE entries SET receivedValue=7000 WHERE id=...                   │
+│                                                                              │
+│   8. Retorna: { ok: true, message: 'Configurações salvas' }                  │
+│                                                                              │
+│ Frontend:                                                                    │
+│   1. Recebe resposta OK                                                      │
+│   2. alert('Configurações salvas e operadores atualizados!')                 │
+│   3. Recarrega lista de operadores para mostrar novos valores                │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+RESUMO DO CÁLCULO DE BONIFICAÇÃO:
+  1. Input: bonificacao, taxa, alocações de operadores
+  2. Pool = bonificacao * taxa%
+  3. Para cada operador:
+     - Se actualValue >= monthlyGoal → weight > 0 (recebe bônus)
+     - Se actualValue < monthlyGoal → weight = 0 (não recebe)
+  4. Distribui pool proporcionalmente aos weights
+  5. Salva em receivedValue (o que operador recebe)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+7. ENDPOINTS DA API (Detalhado)
+═══════════════════════════════════════════════════════════════════════════════
+
+AUTENTICAÇÃO
+────────────
+
+POST /api/login
+  Input:  { id: '00010', password: '1234', session?: 'bv_cartao' }
+  Output: { token: 'Bearer ...', user: { id, isMaster, wallet } }
+  Função: backend/server.js linha 169
+  Fluxo:  1. Hash password com bcrypt.compare
+          2. Se OK, gera JWT token
+          3. Retorna token + dados user
+
+
+POST /api/register
+  Input:  { id: '00010', password: '1234', wallet: 'BV', name: 'Maria', session?: 'bv_rodas' }
+  Output: { token: 'Bearer ...', user: { id, isMaster, wallet } }
+  Função: backend/server.js linha 175
+  Fluxo:  1. Hash password com bcrypt
+          2. INSERT users(id, password, wallet, name, isMaster)
+          3. Gera JWT token
+          4. Auto-login
+
+
+OPERADOR (Singular)
+───────────────────
+
+GET /api/operator/tabela/todos
+  Input:  Headers: { Authorization: 'Bearer ...' }
+  Output: { operadores: [ { id, name, wallet, meta, valorAtingido, percentual, renegociacoes }, ... ] }
+  Função: routes/operator.js linha 21
+  Fluxo:  1. SELECT todos os users não-master
+          2. Para cada user, busca última entry
+          3. Calcula percentual = (actualValue / monthlyGoal) * 100
+          4. Conta riscos para cada entry
+          5. Retorna tabela completa
+
+
+GET /api/operator/:id
+  Input:  Headers: { Authorization: 'Bearer ...' }
+  Params: id = '00010'
+  Output: {
+            user: { id, name, wallet, isMaster },
+            entry: { id, monthlyGoal, actualValue, receivedValue, timestamp },
+            risks: [ { id, riskPremium }, ... ],
+            breakdown: {
+              realFaturamento,
+              baseValue,
+              riskSum,
+              percentualAtingido,
+              concBalance
+            }
+          }
+  Função: routes/operator.js linha 50
+  Fluxo:  1. SELECT user WHERE id
+          2. SELECT conc_wallets (saldo de pontos)
+          3. SELECT última entry do operador
+          4. SELECT todos risks para essa entry
+          5. Calcula breakdown
+          6. Retorna dados completos
+
+
+OPERADORES (Plural - CRUD)
+───────────────────────────
+
+GET /api/operators?wallet=BV
+  Input:  Query param: wallet='BV'
+  Output: [ { id, name, wallet, status }, ... ]
+  Função: routes/operators.js
+  Fluxo:  1. SELECT * FROM users WHERE wallet=? AND isMaster=0
+          2. Retorna lista de operadores
+
+
+POST /api/operators
+  Input:  { id: '00020', password: '1234', wallet: 'BV', name: 'Pedro' }
+  Output: { ok: true, operatorId: '00020' }
+  Função: routes/operators.js
+  Fluxo:  1. Hash password
+          2. INSERT users
+          3. CREATE conc_wallets (saldo 0)
+          4. Retorna sucesso
+
+
+PUT /api/operators/:id
+  Input:  { name: 'Pedro Silva', status: 'inativo' }
+  Output: { ok: true }
+  Função: routes/operators.js
+  Fluxo:  1. UPDATE users SET name=?, status=? WHERE id=?
+          2. Recalcula receivedValue de todos operadores dessa wallet
+          3. Retorna sucesso
+
+
+DELETE /api/operators/:id
+  Input:  Nenhum body
+  Output: { ok: true }
+  Função: routes/operators.js
+  Fluxo:  1. DELETE FROM users WHERE id=?
+          2. DELETE FROM entries WHERE operatorId=?
+          3. DELETE FROM risks WHERE entryId IN (SELECT id FROM entries WHERE operatorId=?)
+          4. Retorna sucesso
+
+
+MASTER (Dashboard e Configuração)
+──────────────────────────────────
+
+GET /api/master/wallet-summary
+  Input:  Headers: { Authorization: 'Bearer ... (master token) ...' }
+  Output: {
+            wallet: 'BV',
+            totalRecebimento: 450000.50,
+            metaCarteira: 1000000,
+            percentualAtingido: 45.00,
+            operatorCount: 12,
+            bonificacao: 50000
+          }
+  Função: routes/master.js linha 43
+  Fluxo:  1. Extrai wallet do JWT (req.user.wallet)
+          2. SELECT SUM(receivedValue) FROM entries
+             WHERE operatorId IN (SELECT id FROM users WHERE wallet=?)
+          3. Calcula meta_carteira e percentual
+          4. COUNT operadores
+          5. Retorna summary
+
+
+GET /api/master/operators-dashboard
+  Input:  Headers: { Authorization: 'Bearer ... (master token) ...' }
+  Output: {
+            wallet: 'BV',
+            operators: [
+              { id, name, percentualAtingido, recebimento, bonusPredito, ... },
+              ...
+            ]
+          }
+  Função: routes/master.js
+  Fluxo:  1. SELECT todos operadores do master
+          2. Para cada um, busca última entry
+          3. Calcula percentual e bônus
+          4. Retorna lista com detalhes
+
+
+GET /api/master/risks
+  Input:  Headers: { Authorization: 'Bearer ...' }
+  Output: { risks: [ { operatorId, riskCount, totalRiskValue, ... }, ... ] }
+  Função: routes/master.js
+  Fluxo:  1. SELECT COUNT(*) e SUM(riskPremium) FROM risks
+             WHERE entryId IN (SELECT id FROM entries
+             WHERE operatorId IN (SELECT id FROM users WHERE wallet=?))
+          2. Agrupa por operador
+          3. Retorna análise de riscos
+
+
+WALLETS
+────────
+
+GET /api/wallets/:wallet
+  Input:  Params: wallet='BV'
+  Output: {
+            wallet: 'BV',
+            bonificacao: 50000,
+            taxa: 10,
+            allocations: { '00010': 40, '00011': 60 }
+          }
+  Função: routes/wallets.js linha 15
+  Fluxo:  1. SELECT * FROM wallets WHERE wallet=?
+          2. SELECT * FROM allocations WHERE wallet=?
+          3. Retorna configuração
+
+
+POST /api/wallets/:wallet
+  Input:  { bonificacao: 50000, taxa: 10, allocations: { '00010': 40, '00011': 60 } }
+  Output: { ok: true, message: 'Configurações salvas' }
+  Função: routes/wallets.js linha 28
+  Fluxo:  1. UPDATE wallets SET bonificacao=?, taxa=?
+          2. DELETE allocations antigas
+          3. INSERT alocações novas
+          4. Recalcula receivedValue para todos operadores (IMPORTANTE!)
+          5. Retorna sucesso
+
+
+CONCCOIN (Pontos e Desbloqueios)
+─────────────────────────────────
+
+GET /api/conc/:operatorId/balance
+  Input:  Params: operatorId='00010'
+  Output: { operatorId: '00010', balance: 1500 }
+  Função: routes/conc.js linha 16
+  Fluxo:  1. SELECT balance FROM conc_wallets WHERE operatorId=?
+          2. Se não existe, retorna 0
+          3. Retorna saldo
+
+
+GET /api/conc/:operatorId/unlocks
+  Input:  Params: operatorId='00010'
+  Output: { operatorId: '00010', unlocks: [ { carPath, cost, timestamp }, ... ] }
+  Função: routes/conc.js linha 26
+  Fluxo:  1. SELECT * FROM unlocks WHERE operatorId=?
+          2. Retorna lista de carros desbloqueados
+
+
+GET /api/conc/ranking/:wallet
+  Input:  Params: wallet='BV'
+  Output: {
+            wallet: 'BV',
+            ranking: [
+              { operatorId: '00011', name: 'João', points: 3200, selectedCar: 'Carro1.jpg' },
+              { operatorId: '00010', name: 'Maria', points: 1500, selectedCar: null },
+              ...
+            ]
+          }
+  Função: routes/conc.js linha 42
+  Fluxo:  1. SELECT u.id, u.name, COALESCE(c.balance, 0) as points
+             FROM users u LEFT JOIN conc_wallets c ...
+             WHERE u.wallet=? AND u.isMaster=0
+          2. Ordena por points DESC (maior pontuação primeiro)
+          3. Se houver custom ranking, usa esse
+          4. Retorna ranking
+
+
+POST /api/conc/:operatorId/unlock
+  Input:  { carPath: 'assets/Carros/Carro1.jpg', cost: 500 }
+  Output: { ok: true, balance: 1000 }
+  Função: routes/conc.js linha 72
+  Fluxo:  1. SELECT balance FROM conc_wallets WHERE operatorId=?
+          2. Se balance < cost, retorna erro
+          3. newBalance = balance - cost
+          4. UPDATE conc_wallets SET balance=? WHERE operatorId=?
+          5. INSERT unlocks(operatorId, carPath, cost, timestamp)
+          6. Retorna novo saldo
+
+
+POST /api/conc/:operatorId/select
+  Input:  { carPath: 'assets/Carros/Carro1.jpg' }
+  Output: { ok: true, selectedCar: 'assets/Carros/Carro1.jpg' }
+  Função: routes/conc.js linha 93
+  Fluxo:  1. UPDATE users SET selectedCar=? WHERE id=?
+          2. Retorna OK
+
+
+═══════════════════════════════════════════════════════════════════════════════
+8. LÓGICA DE NEGÓCIO (Metas, Bonificações, ConcCoins)
+═══════════════════════════════════════════════════════════════════════════════
+
+A. CÁLCULO DE META (monthlyGoal vs actualValue)
+─────────────────────────────────────────────────
+
+monthlyGoal: Meta de faturamento para o operador
+  • Definido pelo master
+  • Exemplo: 100.000,00
+
+actualValue: Valor real que operador relatou
+  • Reportado pelo operador ou master
+  • Exemplo: 85.000,00
+
+percentualAtingido = (actualValue / monthlyGoal) * 100
+  • Porcentagem da meta atingida
+  • Exemplo: (85.000 / 100.000) * 100 = 85%
+
+
+B. CÁLCULO DE BONIFICAÇÃO (Para BV_RODAS)
+─────────────────────────────────────────
+
+Cenário: 2 operadores, bonificacao=50.000, taxa=10%
+
+1. Calcula pool a distribuir:
+   B = 50.000 * (10 / 100) = 5.000
+   → 5.000 disponíveis para distribuir
+
+2. Para cada operador, calcula weight:
+   weight = max(0, percentualAtingido - 100)
+   
+   Operador 1 (Maria): 85%
+   weight = max(0, 85 - 100) = max(0, -15) = 0
+   → Não ultrapassou meta, weight=0
+   
+   Operador 2 (João): 160%
+   weight = max(0, 160 - 100) = max(0, 60) = 60
+   → Ultrapassou 60%, weight=60
+
+3. Calcula total de weights:
+   totalWeight = 0 + 60 = 60
+
+4. Distribui bônus proporcionalmente:
+   Maria: 5.000 * (0 / 60) = 0
+   João:  5.000 * (60 / 60) = 5.000
+   → João recebe TODO o bônus porque só ele ultrapassou a meta
+
+5. Soma com riscos:
+   Maria: receivedValue = 0 + 0 (sem riscos) = 0
+   João:  receivedValue = 5.000 + 2.000 (riscos) = 7.000
+
+RESULTADO:
+  Maria recebe: 0 (não ultrapassou meta)
+  João recebe:  7.000 (5.000 bônus + 2.000 riscos)
+
+
+C. CÁLCULO ESPECIAL PARA BV_CARTÃO
+───────────────────────────────────
+
+Para carteira BV_CARTÃO, a lógica é diferente:
+
+Entrada: { dias_atraso, acordo, acordo_performance, boleto_value }
+
+1. Classifica dias de atraso:
+   classifyDias(dias):
+   • 95-120 dias    → CL1, faixa 1
+   • 121-180 dias   → CL1, faixa 2
+   • 181-360 dias   → CL1, faixa 3
+   • 361-720 dias   → CL2, faixa 1
+   • > 720 dias     → CL2, faixa 2
+
+2. Calcula receivedValue baseado em classificação:
+   
+   SE CL1:
+     receivedValue = 30% * acordo_performance
+     Exemplo: se performance=10.000, recebe=3.000
+   
+   SE CL2:
+     receivedValue = boleto_value (valor integral)
+     Exemplo: boleto_value=5.000, recebe=5.000
+   
+   ELSE (sem classificação):
+     receivedValue = 0
+
+Código em utils/bv_calculos.js:
+  function calculateReceivedForCard(entry) {
+    const dias = Number(entry.dias_atraso || 0);
+    const cls = classifyDias(dias);
+    if (cls.cls === 'CL1') {
+      const perf = Number(entry.acordo_performance || 0);
+      return Number((0.3 * perf).toFixed(2));
+    }
+    if (cls.cls === 'CL2') {
+      return Number((Number(entry.boleto_value || 0)).toFixed(2));
+    }
+    return 0;
+  }
+
+
+D. CÁLCULO DE CONCCOIN (Pontos de Gamificação)
+───────────────────────────────────────────────
+
+ConcCoin são pontos acumulados por desempenho:
+
+1. Base: 1 ConcCoin por 1.000 unidades de faturamento
+   coins = floor(actualValue / 1000)
+   
+   Exemplo: actualValue = 85.000
+   coins = floor(85.000 / 1000) = floor(85) = 85 moedas
+
+2. Bônus: 2 ConcCoins por renegociação resolvida
+   coins += (numero_de_riscos * 2)
+   
+   Exemplo: 4 renegociações
+   coins += (4 * 2) = 8 moedas
+   
+   Total: 85 + 8 = 93 ConcCoins
+
+3. Prêmio final:
+   award = max(0, coins)
+   → Não pode ser negativo
+
+4. Idempotência:
+   • Tabela entries.conc_awarded rastreia quantas moedas já foram
+     premiadas para cada entry
+   • Se entry.conc_awarded = 85 e novo award = 93
+   • delta = 93 - 85 = 8 moedas novas
+   • Apenas 8 são adicionadas ao saldo
+
+Código em routes/operators.js:
+  const COIN_DIVISOR = 1000;
+  const COIN_PER_RENEG = 2;
+  const numReneg = (contagem de risks para entry);
+  const rawAward = Math.floor(actualValue / COIN_DIVISOR) + (numReneg * COIN_PER_RENEG);
+  const award = Math.max(0, rawAward);
+  const delta = award - already_awarded;
+  if(delta > 0) {
+    UPDATE conc_wallets SET balance = balance + delta;
+  }
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9. COMPONENTES FRONTEND
+═══════════════════════════════════════════════════════════════════════════════
+
+ARQUIVOS JAVASCRIPT:
+
+frontend/js/spa.js
+───────────────────
+Responsabilidade: Roteamento (Single Page Application)
+Linha-chave:
+  • Detecta view atual (view-operator, view-master, view-garagem, etc.)
+  • Carrega scripts JS correspondentes dinamicamente
+  • Implementa hide/show entre views
+  • localStorage.getItem('isMaster') determina qual dashboard mostra
+
+frontend/js/auth.js
+────────────────────
+Responsabilidade: Autenticação (Login e Registro)
+Função: api(path, opts)
+  • Helper para fazer fetch com Authorization header
+  • Busca token de localStorage
+  • Adiciona header Authorization: 'Bearer ' + token
+
+Listeners:
+  • btnLogin: POST /api/login, salva token, redireciona
+  • btnRegister: POST /api/register
+  • btnBack: Volta para login
+
+frontend/js/operator.js
+────────────────────────
+Responsabilidade: Dashboard do operador
+Função: initOperatorLazy()
+  • Aguarda DOM pronto antes de carregar dados
+  • Usa IntersectionObserver para lazy loading
+
+Função: loadOperatorData()
+  • GET /api/operator/00010 (ID do token)
+  • Atualiza elementos HTML:
+    - operatorMatricula, operatorName
+    - operatorMeta, operatorValor, operatorPercentual
+    - opConcBalance
+  • Renderiza tabela de riscos
+  • Formata números para moeda brasileira
+
+frontend/js/master.js
+──────────────────────
+Responsabilidade: Dashboard do master
+Função: IIFE (Immediately Invoked Function Expression)
+  • Valida token e extrai payload (wallet, isMaster)
+  • carrega lista de operadores: GET /api/operators?wallet=BV
+
+Listeners:
+  • btnSaveWalletSettings: POST /api/wallets/BV
+    - Coleta bonificacao, taxa, allocations de formulário
+    - Envia para servidor
+    - Recarrega lista
+  
+  • btnVisualizarTabela: Navega para operadores_tabela.html
+  • btnMasterLogout: Remove token, vai para login
+
+frontend/js/master-system.js
+──────────────────────────────
+Responsabilidade: Sistema avançado de master
+Funções:
+  • Gerenciamento avançado de operadores
+  • Análise de riscos
+  • Relatórios customizados
+
+frontend/js/garagem.js
+───────────────────────
+Responsabilidade: Garagem de carros (desbloqueios com ConcCoins)
+Fluxo:
+  1. Carrega lista de carros (assets/Carros/)
+  2. GET /api/conc/00010/balance (saldo de pontos)
+  3. GET /api/conc/00010/unlocks (carros já desbloqueados)
+  4. Mostra carros bloqueados com custo em ConcCoins
+  5. Click em carro:
+     - Se saldo >= custo:
+       POST /api/conc/00010/unlock { carPath, cost }
+     - Se saldo < custo:
+       alert('Saldo insuficiente')
+
+frontend/js/conc-racing.js
+────────────────────────────
+Responsabilidade: Ranking e competição
+Fluxo:
+  1. GET /api/conc/ranking/BV
+  2. Renderiza ranking de operadores por ConcCoins
+  3. Mostra carro selecionado de cada um (selectedCar)
+  4. Efeitos visuais: "racing", animações
+  5. Auto-refresh a cada 30s
+
+frontend/js/ui_common.js
+─────────────────────────
+Responsabilidade: Funções de UI reutilizáveis
+Funções:
+  • formatCurrency(value): Formata número para moeda BR
+    (3000000 → '3.000.000,00')
+  • formatDate(timestamp): Formata data
+  • showLoading(), hideLoading(): Spinner de carregamento
+  • etc.
+
+ARQUIVOS HTML:
+
+frontend/index.html
+────────────────────
+SPA principal com múltiplas views (display: none/block):
+  • view-login: Tela de login
+  • view-operator: Dashboard operador
+  • view-master: Dashboard master
+  • view-garagem: Garagem de carros
+  • view-ranking: Ranking
+  • etc.
+
+Carrega scripts na ordem:
+  1. spa.js (roteamento)
+  2. auth.js (autenticação)
+  3. Outros por demanda
+
+frontend/css/style.css
+───────────────────────
+Estilos CSS para todos os componentes:
+  • .container: Layout principal
+  • .card: Caixas de conteúdo
+  • .table: Tabelas
+  • Responsivo (media queries)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+10. SCRIPTS E UTILITÁRIOS
+═══════════════════════════════════════════════════════════════════════════════
+
+backend/scripts/
+
+check_entries_for_user.js
+  Uso: node check_entries_for_user.js <operatorId>
+  Função: Verifica todas as entries de um operador
+  Output: Lista de entradas com cálculos
+
+inspect_operator.js
+  Uso: node inspect_operator.js <operatorId>
+  Função: Debug completo de um operador
+  Output: User data, entries, risks, conc_wallets
+
+list_risks.js
+  Uso: node list_risks.js
+  Função: Lista todos os riscos do banco
+  Output: Risk ID, entry ID, operador, valor
+
+query_user.js
+  Uso: node query_user.js <id>
+  Função: Query customizável no banco
+  Output: Dados do usuário
+
+cleanup_bv_cartao_risks.js
+  Uso: node cleanup_bv_cartao_risks.js
+  Função: Remove riscos indevidos da carteira BV_CARTÃO
+  Output: Quantidade de riscos removidos
+
+delete_user.js
+  Uso: node delete_user.js <operatorId>
+  Função: Deleta usuário e todos seus dados
+  Output: Confirmação de deleção
+
+
+═══════════════════════════════════════════════════════════════════════════════
+RESUMO FINAL: FLUXO DE UMA TRANSAÇÃO COMPLETA
+═══════════════════════════════════════════════════════════════════════════════
+
+1. USUÁRIO ACESSA APLICAÇÃO
+   └─> /index.html (SPA) + js/spa.js (roteamento)
+
+2. LOGIN
+   └─> POST /api/login { id, password }
+       └─> Valida credenciais com bcrypt
+       └─> Gera JWT token
+       └─> localStorage.setItem('token', ...)
+       └─> Redireciona para dashboard
+
+3. CARREGA DASHBOARD (exemplo: operador)
+   └─> GET /api/operator/:id (com Bearer token)
+       └─> authMiddleware verifica JWT
+       └─> SELECT user, entries, risks FROM database
+       └─> Calcula percentualAtingido, breakdown
+       └─> Retorna JSON
+
+4. FRONTEND RENDERIZA DADOS
+   └─> loadOperatorData() atualiza DOM
+   └─> formatCurrency() formata números
+   └─> Tabela de riscos é renderizada
+   └─> User vê dashboard atualizado
+
+5. MASTER MODIFICA CONFIGURAÇÕES
+   └─> POST /api/wallets/:wallet { bonificacao, taxa, allocations }
+       └─> UPDATE wallets
+       └─> DELETE allocations antigas
+       └─> Para cada operador:
+           ├─> Busca última entry
+           ├─> Calcula weight baseado em performance
+       └─> Distribui pool de bônus entre operadores
+       └─> UPDATE entries.receivedValue para cada um
+
+6. CÁLCULO DE CONCCOIN (automático ao recalcular)
+   └─> Conta moedas: floor(actualValue / 1000) + (riscos * 2)
+   └─> Atualiza conc_wallets.balance
+   └─> Registra em entries.conc_awarded (idempotente)
+
+7. OPERADOR DESBLOQUEIA CARRO
+   └─> POST /api/conc/:id/unlock { carPath, cost }
+       └─> Verifica saldo em conc_wallets
+       └─> Se saldo >= cost:
+           ├─> UPDATE conc_wallets (reduz saldo)
+           ├─> INSERT unlocks (registra desbloqueio)
+           └─> Retorna novo saldo
+       └─> Senão: Retorna erro "Saldo insuficiente"
+
+8. RANKING ATUALIZADO EM TEMPO REAL
+   └─> GET /api/conc/ranking/:wallet
+       └─> SELECT users + conc_wallets
+       └─> ORDER BY balance DESC
+       └─> Retorna ranking com pontos de cada um
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FIM DA DOCUMENTAÇÃO
+═══════════════════════════════════════════════════════════════════════════════

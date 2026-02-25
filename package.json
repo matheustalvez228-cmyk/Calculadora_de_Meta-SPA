@@ -1,0 +1,38 @@
+{
+  "name": "sistema-meta-concilig",
+  "version": "1.0.0",
+  "description": "Plataforma web de gerenciamento de operadores com cálculo de metas, gamificação e análise de performance",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "install-all": "cd backend && npm install",
+    "init-db": "cd backend && node init_db.js",
+    "dev": "cd backend && npm start",
+    "backup-db": "cd backend && powershell -Command \"Copy-Item data.sqlite3 -Destination \\\"data.sqlite3.backup.$(Get-Date -Format yyyy-MM-dd_HH-mm-ss).backup\\\"\"",
+    "reset-db": "cd backend && node init_db.js"
+  },
+  "keywords": [
+    "dashboard",
+    "operadores",
+    "metas",
+    "performance",
+    "gamificação",
+    "nodejs",
+    "express",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seu-usuario/sistema-meta-concilig.git"
+  },
+  "bugs": {
+    "url": "https://github.com/seu-usuario/sistema-meta-concilig/issues"
+  },
+  "homepage": "https://github.com/seu-usuario/sistema-meta-concilig#readme"
+}
